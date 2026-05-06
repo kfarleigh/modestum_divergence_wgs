@@ -1,6 +1,6 @@
 # Modestum selection scans
 
-# Isolate population-specific vcfs.
+# Isolate population-specific vcfs. The merged_modestum vcf is the same as the all sites, but has been filtered to require maf of 0.05, biallelic snps (remove invariant sites) and a missing data threshold of 50% (allowing using to include a greater SNP density than when we require 90% data). 
 
 # Population specific vcfs
 bcftools view -S popmap.north --threads 4 -o ./north.vcf.gz ../../../phasing/merged_modestum.vcf.gz
