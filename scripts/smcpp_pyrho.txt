@@ -1,0 +1,126 @@
+# Phrynosoma modestum whole genome estimation of recombination rate
+# Author: Keaka Farleigh, Ph.D., adapted by Julia Amoroso
+# Date: December 26th, 2025
+# Email: keakafarleigh@virginia.edu / jamoroso@gradcenter.cuny.edu
+
+# Purpose
+# This script will use [smc++](https://github.com/popgenmethods/smcpp) to estimate effective population size over time. We will do this for every individual in each species and for just a single locality in each species. We will then use the locality inferences to inform our recombination rates that we estimate using [pyrho](https://github.com/popgenmethods/pyrho). 
+
+## Location 
+# This analysis was performed on the Huxley cluster at the American Museum of Natural History.
+
+## What we'll need 
+
+# We will need the mutation rate, generation time, and genotypes of our species. 
+# **_Note_**. _smc++ uses per-generation mutation rate_. 
+# Our per generation mutation rate is 7.7 x 10^-10
+
+#Load modules
+module load Singularity
+module load BCFtools
+module load HDF5
+module load Python
+module load GCC
+module load BEDTools
+
+### Install smcpp 
+# Huxley does not use docker, so we can use singularity to pull the docker image 
+singularity pull docker://terhorst/smcpp
+
+# Nice, everything should be good to go. Let's set up our directory for smc++ and pull in the population map. 
+cd /home/jamoroso/modestum_proj
+
+# Set up smc++ directories and such
+mkdir smc++
+cd smc++
+mkdir out
+mkdir analysis
+mkdir vcf
+
+# We will use individuals from a single clade to avoid any issues with population substructure (this txt file was previously generated in R). We will only use data from the autosomes as well. 
+# Randomly select 3 individuals from this clade for smc++ run
+#retry with different clade 1?
+shuf -n 3 clade1.txt > distinguished.list
+
+# Next, we will split the vcf by chromosome. 
+bcftools index -s modestum_ingroup_0.9missing.vcf.gz | cut -f 1 | for cm in `cat CM_list.txt`; do bcftools view -O z -o split.${cm}.vcf.gz modestum_ingroup_0.9missing.vcf.gz "${cm}" ; done
+
+
+#Convert vcf to smc++ input format. `-c` sets any run of homozygosity greater then 50,000 bp to missing; `-d` can be used to list different individuals and create distinct datasets (see smc++ GitHub for more details
+for indv in `cat distinguished.list`; 
+    do for cm in `cat CM_list.txt`; 
+        do singularity run smcpp_latest.sif vcf2smc -c 50000 split.${cm}.vcf.gz $cm.smc.gz $cm NorthPop:DRD_9182,CB_0002,CB_0001,UTEP_18974,TNHC_117229 -d $indv $indv; 
+     done; 
+done
+
+
+#Fit the model using the `estimate` function. Notice that we use our mutation rate here. The `--timepoints` are in generations. 
+for file in *.smc.gz
+        do singularity run smcpp_latest.sif estimate 7.7e-10 --timepoints 1000 200000 $file
+done
+
+# Plot the results.`-c` generates a csv of the results. 
+singularity run smcpp_latest.sif plot modestum_SMC_coalescent.pdf model.final.json -c
+
+## pyrho 
+# Create conda environment
+conda create -n pyrho python=3.10
+conda activate pyrho
+conda install -c conda-forge numpy=1.26 scipy=1.15 gsl pip setuptools wheel cython pkg-config make gcc gxx
+
+# Clone and install ldpop
+git clone https://github.com/popgenmethods/ldpop
+pip3 install ldpop/
+
+# Clone and install pyrho (the github includes other dependencies that you may need to install before installing pyrho)
+git clone https://github.com/popgenmethods/pyrho.git pyrho
+#install patch to fix incompatibilities between python versions bleh
+
+pip3 install pyrho/
+
+# Check that pyrho runs yay
+python3 -m pytest pyrho/tests/tests.py
+
+#Now, we will estimate the recombination rate using pyrho. See the installation instructions above if you need to install pyrho.
+#We will need vcfs for each chromosome, a mutation rate, a population assignment file, and the demography inferred by smc++. The demography is used to guide our hyperparameter settings. 
+#First, lets activate pyrho and set up our directory.
+
+cd /modestum_proj
+mkdir pyrho 
+cd ./pyrho
+mkdir out
+mkdir analysis
+mkdir lookup
+mkdir vcf 
+
+#Generate lookup tables. `-n` and `-N` are sample size, `-n` is the number of haplotypes and `-N` is recommended to be 25%-50% larger then `-n`. We have 5 samples, so `-n` = 10 and `-N` = (10*1.25) = 12.5. `-m` is the per-site per-generation mutation rate we used in smc++.
+pyrho make_table -n 10 -N 13 -m 7.7e-10 --logfile . --outfile ./lookup/modestum_n_10_N_13.lookuptable.hdf --approx --smcpp_file ../smc++/vcf/modestum_SMC_coalescent.csv
+
+
+# Find the hyperparameter settings that fit our demography inferred by smc++. Choose the greatest correlation and lowest l2
+pyrho hyperparam -n 10 --mu 7.7e-10 --smcpp_file ../smc++/vcf/modestum_SMC_coalescent.csv --blockpenalty 20,25,50,100 --windowsize 25,50 --logfile . --tablefile ./lookup/modestum_n_10_N_13.lookuptable.hdf --num_sims 3 --outfile modestum_hyperparam_results 
+
+# Run optimize on each chromosome. We chose a Block penalty of 20 and a Window size of 50 because they generally resulted in the greatest correlation and lowest L2. 
+# Autosomes
+for cm in `cat ../smc++/vcf/CM_list.txt`
+    do pyrho optimize --numthreads 24 --tablefile ./lookup/modestum_n_52_N_65.lookuptable.hdf --vcffile ../smc++/vcf/split.${cm}.vcf.gz --outfile modestum.$cm.rmap --blockpenalty 20 --windowsize 50 --ploidy 2 --logfile .
+done
+ 
+# Concatenate recombination maps 
+for cm in `cat ../smc++/vcf/CM_list.txt` 
+ do scaff=`echo "$cm" | cut -f 1`; chrom=`echo "$cm" | cut -f 2`; awk -v var=$scaff 'BEGIN{OFS="\t"}{print var,$1,$2,$3}' modestum.$chrom.rmap >> ./modestum.all.rmap; done
+
+#Use bedtools makewindows to generate 10kb windows that you will calculate the estimates in. The chrom sizes file is a tab delimited column with two columns. The first column is the chromosome name and the second is the chromosome size. 
+grep "chr" cm_size.txt | bedtools makewindows -g - -w 10000 >> ./modestum.final.10Kb.bed
+
+# Set anything above the 99% percentile to NA. 
+dat <- read.table("/modestum.all.rmap")
+
+dat$V4[dat$V4>=quantile(dat$V4, probs = c(0.99)] <- NA
+
+write.table(dat, "modestum.all.outlier.masked.rmap", quote = FALSE, row.names = FALSE, sep = "\t", col.names = FALSE)
+
+
+
+#3. Calculate the recombination rate in windows
+echo -e "chrom\tstart\tend\trate" > modestum.rmap.10Kb.txt; bedtools map -a ./modestum.final.10Kb.bed -b ./modestum.all.outlier.masked.rmap -o mean -c 4 >> modestum.rmap.outliermasked.10Kb.txt
