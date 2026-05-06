@@ -497,6 +497,137 @@ South_TajD_SA2 <- left_join(SA_pop2_winds,South_TajD, by = join_by(chromosome, w
 
 North_DG1vsims <- rbind(North_TajD_DG1[,c(7,5)], td_north_dwgf_sims_df[,c(2,1)])
 
+######################
+#### Simulations #####
+######################
+
+setwd("~/Desktop/Github/Modestum_WGS/Analyses/tajimas_d")
+
+North <- read.delim("north.TajD.10kb.txt")
+
+colnames(North)[1:2] <- c("chromosome", "window_pos_1")
+
+North$window_pos_1 <- as.numeric(North$window_pos_1)
+
+North$TajimaD <- as.numeric(North$TajimaD)
+
+North$window_pos_1 <- North$window_pos_1 + 1
+
+# Get pi windows with z-scores in the divergence with gene flow range
+Pi_pop1_sims <- Pi_pop1 %>% filter(z_score_bypop < -0.67 & z_score_bypop > -3)
+
+North_Pi_pop1_sims <- left_join(North, Pi_pop1_sims)
+
+North_Pi_pop1_sims <- North_Pi_pop1_sims[complete.cases(North_Pi_pop1_sims),]
+
+# Set our seed
+set.seed(010526)
+
+# Randomly select the same number of the windows as we saw empirically (North = 34, South = 27)
+
+sims <- 10000
+
+td_north_dwgf_sims <- c()
+
+for(j in 1:sims){
+  
+  sim_dat <- North_Pi_pop1_sims %>% slice_sample(n = 34)
+  
+  td_north_dwgf_sims <- c(td_north_dwgf_sims, mean(sim_dat[,4]))
+  
+  remove(sim_dat)
+  
+  print(paste("Finished simulation ", j, " of ", sims, ".", sep = ""))
+  
+}
+
+td_north_dwgf_sims_df <- data.frame(Tajimas.D = td_north_dwgf_sims, comp = "North_dwgf_sim")
+
+### SIA simulations
+# The z-score threshold is the same so we can reuse the one we created before
+
+td_north_sia_sims <- c()
+
+for(j in 1:sims){
+  
+  sim_dat <- North_Pi_pop1_sims %>% slice_sample(n = 85)
+  
+  td_north_sia_sims <- c(td_north_sia_sims, mean(sim_dat[,4]))
+  
+  remove(sim_dat)
+  
+  print(paste("Finished simulation ", j, " of ", sims, ".", sep = ""))
+  
+}
+
+td_north_sia_sims_df <- data.frame(Tajimas.D = td_north_sia_sims, comp = "North_sia_sim")
+
+
+### Do it for the South 
+
+setwd("~/Desktop/Github/Modestum_WGS/Analyses/tajimas_d")
+
+South <- read.delim("south.TajD.10kb.txt")
+
+colnames(South)[1:2] <- c("chromosome", "window_pos_1")
+
+South$window_pos_1 <- as.numeric(South$window_pos_1)
+
+South$TajimaD <- as.numeric(South$TajimaD)
+
+South$window_pos_1 <- South$window_pos_1 + 1
+
+# Get pi windows with z-scores in the divergence with gene flow range
+Pi_pop2_sims <- Pi_pop2 %>% filter(z_score_bypop < -0.67 & z_score_bypop > -3)
+
+South_Pi_pop2_sims <- left_join(South, Pi_pop2_sims)
+
+South_Pi_pop2_sims <- South_Pi_pop2_sims[complete.cases(South_Pi_pop2_sims),]
+
+# Set our seed
+set.seed(010526)
+
+# Randomly select the same number of the windows as we saw empirically (North = 34, South = 27)
+
+sims <- 10000
+
+td_south_dwgf_sims <- c()
+
+for(j in 1:sims){
+  
+  sim_dat <- South_Pi_pop2_sims %>% slice_sample(n = 27)
+  
+  td_south_dwgf_sims <- c(td_south_dwgf_sims, mean(sim_dat[,4]))
+  
+  remove(sim_dat)
+  
+  print(paste("Finished simulation ", j, " of ", sims, ".", sep = ""))
+  
+}
+
+td_south_dwgf_sims_df <- data.frame(Tajimas.D = td_south_dwgf_sims, comp = "South_dwgf_sim")
+
+#SIA simulations
+
+### Do it for the South
+sims <- 10000
+
+td_south_sia_sims <- c()
+
+for(j in 1:sims){
+  
+  sim_dat <- South_Pi_pop2_sims %>% slice_sample(n = 90)
+  
+  td_south_sia_sims <- c(td_south_sia_sims, mean(sim_dat[,4]))
+  
+  remove(sim_dat)
+  
+  print(paste("Finished simulation ", j, " of ", sims, ".", sep = ""))
+  
+}
+
+td_south_sia_sims_df <- data.frame(Tajimas.D = td_south_sia_sims, comp = "South_sia_sim")
+
 # Kruskal-Wallis chi-squared = 40.031, df = 1, p-value < 2.5e-10
 kruskal.test(North_DG1vsims$Tajimas.D, North_DG1vsims$comp)
 
