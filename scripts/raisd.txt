@@ -1,0 +1,59 @@
+# Modestum selection scans
+
+# Regenerate our vcfs, but relax the missing data threshold.
+
+# Population specific vcfs
+bcftools view -S popmap.north --threads 4 -q 0.05:minor -m2 -M2 -U -v snps -i 'F_MISSING<0.5' -O z  -o ./north.vcf.gz ../../../phasing/merged_modestum.vcf.gz
+
+bcftools index -s north.vcf.gz | cut -f 1 | while read C; do bcftools view -O z -o ./chrom_vcf/split.north.${C}.vcf.gz north.vcf.gz "${C}" ; done
+
+bcftools index north.vcf.gz
+
+bcftools view -S popmap.south --threads 4 -q 0.05:minor -m2 -M2 -U -v snps -i 'F_MISSING<0.5' -O z  -o ./south.vcf.gz ../../../phasing/merged_modestum.vcf.g
+
+bcftools index south.vcf.gz
+
+bcftools index -s south.vcf.gz | cut -f 1 | while read C; do bcftools view -O z -o ./chrom_vcf/split.south.${C}.vcf.gz south.vcf.gz "${C}" ; done
+
+# Run raisd
+for i in `ls ../sweepfinder/north/chrom_vcf/split*.vcf.gz`; do echo "RAiSD -n $i -I $i -f" >> north_RAiSD.txt; done
+
+for i in `ls ../sweepfinder/south/chrom_vcf/split*.vcf.gz`; do echo "RAiSD -n $i -I $i -f" >> south_RAiSD.txt; done
+
+nohup parallel -j 6 :::: north_RAiSD.txt > north_RAiSD.log &
+
+nohup parallel -j 6 :::: south_RAiSD.txt > south_RAiSD.log &
+
+
+# Process raisd results
+for i in `ls *Report*`; do chrom=$(echo $i| sed 's/RAiSD_Report.north.//g'); sed "s/$/\t${chrom}.1/" $i > north_${chrom}_RAiSD.out; done
+
+cat *.out > north_RAiSD.out
+
+for i in `ls *Report*`; do chrom=$(echo $i| sed 's/RAiSD_Report.south.//g'); sed "s/$/\t${chrom}.1/" $i > south_${chrom}_RAiSD.out; done
+
+cat *.out > south_RAiSD.out
+
+grep -v "//" north_RAiSD.out > north_RAiSD_filtered.out
+
+grep -v "//" south_RAiSD.out > south_RAiSD_filtered.out
+
+# Make bedfile for analysis
+bedtools makewindows -g platy_chromsizes.genome -w 10000 >> platy_10kb.bed
+
+cp platy_10kb* /media/keaka/extradrive1/modestum/sel_scan/
+
+# Format for bedtools map
+awk '{print $3, $1, $1, $2}' north_RAiSD_filtered.out > ../north_raisd_final.txt
+
+awk '{print $3, $1, $1, $2}' south_RAiSD_filtered.out > ../south_raisd_final.txt
+
+# Make sure everything is tab delimited
+sed 's/ \+/\t/g' north_raisd_final.txt > north_raisd_final_tab.txt
+
+sed 's/ \+/\t/g' south_raisd_final.txt > south_raisd_final_tab.txt
+
+# Calculate in 10kb windows using bedtools map
+bedtools map -a ../platy_10kb.bed -b ./north_raisd_final_tab.txt -o mean -c 4 >> north.10kb.raisd.txt
+
+bedtools map -a ../platy_10kb.bed -b ./south_raisd_final_tab.txt -o mean -c 4 >> south.10kb.raisd.txt
