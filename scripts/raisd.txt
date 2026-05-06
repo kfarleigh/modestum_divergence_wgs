@@ -1,15 +1,15 @@
 # Modestum selection scans
 
-# Regenerate our vcfs, but relax the missing data threshold.
+# Isolate population-specific vcfs.
 
 # Population specific vcfs
-bcftools view -S popmap.north --threads 4 -q 0.05:minor -m2 -M2 -U -v snps -i 'F_MISSING<0.5' -O z  -o ./north.vcf.gz ../../../phasing/merged_modestum.vcf.gz
+bcftools view -S popmap.north --threads 4 -o ./north.vcf.gz ../../../phasing/merged_modestum.vcf.gz
 
 bcftools index -s north.vcf.gz | cut -f 1 | while read C; do bcftools view -O z -o ./chrom_vcf/split.north.${C}.vcf.gz north.vcf.gz "${C}" ; done
 
 bcftools index north.vcf.gz
 
-bcftools view -S popmap.south --threads 4 -q 0.05:minor -m2 -M2 -U -v snps -i 'F_MISSING<0.5' -O z  -o ./south.vcf.gz ../../../phasing/merged_modestum.vcf.g
+bcftools view -S popmap.south --threads 4  -o ./south.vcf.gz ../../../phasing/merged_modestum.vcf.g
 
 bcftools index south.vcf.gz
 
