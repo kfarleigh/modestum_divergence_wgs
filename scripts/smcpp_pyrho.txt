@@ -43,7 +43,7 @@ mkdir vcf
 shuf -n 3 clade1.txt > distinguished.list
 
 # Next, we will split the vcf by chromosome. 
-bcftools index -s modestum_ingroup_0.9missing.vcf.gz | cut -f 1 | for cm in `cat CM_list.txt`; do bcftools view -O z -o split.${cm}.vcf.gz modestum_ingroup_0.9missing.vcf.gz "${cm}" ; done
+bcftools index -s modestum_merged.vcf.gz | cut -f 1 | for cm in `cat CM_list.txt`; do bcftools view -O z -o split.${cm}.vcf.gz modestum_merged.vcf.gz "${cm}" ; done
 
 
 #Convert vcf to smc++ input format. `-c` sets any run of homozygosity greater then 50,000 bp to missing; `-d` can be used to list different individuals and create distinct datasets (see smc++ GitHub for more details
@@ -103,7 +103,7 @@ pyrho hyperparam -n 10 --mu 7.7e-10 --smcpp_file ../smc++/vcf/modestum_SMC_coale
 # Run optimize on each chromosome. We chose a Block penalty of 20 and a Window size of 50 because they generally resulted in the greatest correlation and lowest L2. 
 # Autosomes
 for cm in `cat ../smc++/vcf/CM_list.txt`
-    do pyrho optimize --numthreads 24 --tablefile ./lookup/modestum_n_52_N_65.lookuptable.hdf --vcffile ../smc++/vcf/split.${cm}.vcf.gz --outfile modestum.$cm.rmap --blockpenalty 20 --windowsize 50 --ploidy 2 --logfile .
+    do pyrho optimize --numthreads 24 --tablefile ./lookup/modestum_n_10_N_13.lookuptable.hdf --vcffile ../smc++/vcf/split.${cm}.vcf.gz --outfile modestum.$cm.rmap --blockpenalty 20 --windowsize 50 --ploidy 2 --logfile .
 done
  
 # Concatenate recombination maps 
