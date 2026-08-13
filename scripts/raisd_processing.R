@@ -321,39 +321,3 @@ plotGG(S_sia_raisdboxplot, width = 2, height = 2, x = 6.1, y = 0.1)
 
 pageGuideHide()
 
-
-# Plot genome scans
-
-Chrom_names <- unique(north_raisd$chromosome)
-
-Chrom_names <- Chrom_names[c(1,3,17,18,6,8,10,2,4,5,7,9,11:16)]
-
-north_raisd$chromosome <- factor(north_raisd$chromosome, levels = Chrom_names)
-south_raisd$chromosome <- factor(south_raisd$chromosome, levels = Chrom_names)
-
-north_raisd$Plottin.name <- north_raisd$chromosome
-
-north_raisd %>%
-  #mutate(chrom_color_group = case_when(as.numeric(chromosome) %% 2 != 0 ~ "even",
-  #TRUE ~ "odd" )) %>%
-  mutate(chromosome = factor(chromosome, levels = c(1:18))) %>%
-  ggplot(aes(x = (start + end)/2, y = mu, color = "#ebebeb"))+
-  geom_line(linewidth = 1.25, alpha = 0.25)+
-  facet_grid(mu  ~ Plottin.name,
-             scales = "free", switch = "x", space = "free_x") +
-  xlab("Chromsome")+
-  ylab("Statistic Value")+
-  #scale_color_manual(values = c("#9e0142", "#5e4fa2"))+
-  theme_classic()+
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank(),
-        panel.spacing = unit(0.1, "cm"),
-        strip.background = element_blank(),
-        strip.placement = "outside",
-        legend.position ="none", 
-        strip.text.x = element_text(angle = 90))+
-  scale_x_continuous(expand = c(0, 0)) +
-  scale_y_continuous(expand = c(0, 0), limits = c(0,NA))
-
-
-
