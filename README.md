@@ -7,7 +7,7 @@ The citation will be here.
 
 ## Genomic data
 
-The genomic data for this project are deposited at [PRJNA1395130](); the link will not work until the BioProject is published.
+The genomic data for this project are deposited at [PRJNA1395130](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJNA1395130).
 
 ## Structure of this repository.
 
